@@ -153,32 +153,6 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
     gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
             "returning subvol:%d", i, NULL);
 
-    /*
-    uint32_t hash = 0;
-    xlator_t *subvol = NULL;
-    int i = 0;
-    int ret = 0;
-
-    ret = dht_hash_compute(this, layout->type, name, &hash);
-    if (ret != 0) {
-        gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
-                "type=%d", layout->type, "name=%s", name, NULL);
-        goto out;
-    }
-
-    for (i = 0; i < layout->cnt; i++) {
-        if (layout->list[i].start <= hash && layout->list[i].stop >= hash) {
-            subvol = layout->list[i].xlator;
-            break;
-        }
-    }
-
-    if (!subvol) {
-        gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_HASHED_SUBVOL_GET_FAILED,
-                "hash-value=0x%x", hash, NULL);
-    }
-    */
-
 out:
     return subvol;
 }
