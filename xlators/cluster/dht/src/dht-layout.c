@@ -10,7 +10,10 @@
 
 #include "dht-common.h"
 #include <glusterfs/byte-order.h>
+#include <sys/time.h>
 #include "unittest/unittest.h"
+// davy's
+#include "glusterfs/glusterfs-fops.h"
 
 #define layout_base_size (sizeof(dht_layout_t))
 
@@ -106,6 +109,51 @@ dht_layout_ref(dht_layout_t *layout)
 xlator_t *
 dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
 {
+    uint64_t last = GF_ATOMIC_GET(
+            layout->list[0].xlator->stats[GF_FOP_WRITE].last_check);
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    uint64_t now = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+
+    gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
+            "now:%lu last:%lu", now, last, NULL);
+
+    if ((now - last) >= 500) {
+        for (int i = 0; i < layout->cnt; i++) {
+            uint64_t interval_fop = GF_ATOMIC_GET(
+                    layout->list[i].xlator->stats[GF_FOP_WRITE].interval_fop);
+            GF_ATOMIC_SWAP(
+                    layout->list[i].xlator->stats[GF_FOP_WRITE].last_interval_fop,
+                    interval_fop);
+            GF_ATOMIC_SWAP(
+                    layout->list[i].xlator->stats[GF_FOP_WRITE].interval_fop,
+                    0); 
+            GF_ATOMIC_SWAP(
+                    layout->list[i].xlator->stats[GF_FOP_WRITE].last_check,
+                    now);
+            gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
+                    "davy-updated", NULL);
+        }
+    }
+
+    int i = 0;
+    xlator_t *subvol = NULL;
+    uint64_t min_fop = 0xFFFFFFFFFFFFFFFF;
+    uint64_t fop;
+
+    for (i = 0; i < layout->cnt; i++) {
+        fop = GF_ATOMIC_GET(layout->list[i].xlator->stats[GF_FOP_WRITE].last_interval_fop);
+        gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
+                "subvol:%d fops:%lu", i, fop, NULL);
+        if (fop < min_fop){
+            min_fop = fop;
+            subvol = layout->list[i].xlator;
+        }
+    }
+    gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
+            "returning subvol:%d", i, NULL);
+
+    /*
     uint32_t hash = 0;
     xlator_t *subvol = NULL;
     int i = 0;
@@ -129,6 +177,7 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
         gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_HASHED_SUBVOL_GET_FAILED,
                 "hash-value=0x%x", hash, NULL);
     }
+    */
 
 out:
     return subvol;

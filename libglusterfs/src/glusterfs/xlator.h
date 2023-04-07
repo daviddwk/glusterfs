@@ -797,7 +797,9 @@ struct _xlator {
     gf_loglevel_t loglevel; /* Log level for translator */
 
     struct {
+        gf_atomic_t last_check;
         gf_atomic_t total_fop;
+        gf_atomic_t last_interval_fop;
         gf_atomic_t interval_fop;
         gf_atomic_t total_fop_cbk;
         gf_atomic_t interval_fop_cbk;

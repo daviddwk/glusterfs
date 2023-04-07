@@ -605,6 +605,8 @@ __xlator_init(xlator_t *xl)
 
         GF_ATOMIC_INIT(xl->stats[fop_idx].interval_fop, 0);
         GF_ATOMIC_INIT(xl->stats[fop_idx].interval_fop_cbk, 0);
+
+        GF_ATOMIC_INIT(xl->stats[fop_idx].last_check, 0);
     }
 
     xlator_init_lock();
