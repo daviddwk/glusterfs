@@ -14,6 +14,7 @@
 #include "unittest/unittest.h"
 // davy's
 #include "glusterfs/glusterfs-fops.h"
+#include <stdlib.h>
 
 #define layout_base_size (sizeof(dht_layout_t))
 
@@ -113,12 +114,12 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
             layout->list[0].xlator->stats[GF_FOP_WRITE].last_check);
     struct timeval tp;
     gettimeofday(&tp, NULL);
-    uint64_t now = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    uint64_t now = (1000000 * tp.tv_sec) + tp.tv_usec;
 
     gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
             "now:%lu last:%lu", now, last, NULL);
 
-    if ((now - last) >= 500) {
+    if ((now - last) >= 500000) { // in microseconds
         for (int i = 0; i < layout->cnt; i++) {
             uint64_t interval_fop = GF_ATOMIC_GET(
                     layout->list[i].xlator->stats[GF_FOP_WRITE].interval_fop);
@@ -137,19 +138,67 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
     }
 
     int i = 0;
-    xlator_t *subvol = NULL;
-    uint64_t min_fop = 0xFFFFFFFFFFFFFFFF;
     uint64_t fop;
+    xlator_t *subvol = NULL;
+#define RANDMIN2
+#ifdef MINRAND2
+    uint64_t fop_first, fop_second;
+    int index_first, index_second;
+
+    srand(tp.tv_usec);
+
+    index_first = rand() % layout->cnt;
+    index_second = rand() % layout->cnt;
+    
+    fop_first = GF_ATOMIC_GET(
+            layout->list[index_first].xlator->stats[GF_FOP_WRITE].last_interval_fop);
+    fop_second = GF_ATOMIC_GET(
+            layout->list[index_second].xlator->stats[GF_FOP_WRITE].last_interval_fop);
+
+    if (fop_first < fop_second) {
+        subvol = layout->list[index_first].xlator;
+    } else {
+        subvol = layout->list[index_second].xlator;
+    }
+
+#elif defined(RANDMIN2)
+    uint64_t fop_first, fop_second = 0xFFFFFFFFFFFFFFFF;
+    int index_first, index_second = 0;
+    
+    // find 2 smallest elements
+    for (i = 0; i < layout->cnt; i++) {
+        fop = GF_ATOMIC_GET(layout->list[i].xlator->stats[GF_FOP_WRITE].last_interval_fop);
+        if (fop < fop_first) {
+            fop_second = fop_first;
+            index_second = index_first;
+            fop_first = fop;
+            index_first = i;
+        } else if (fop < fop_second) {
+            fop_second = fop;
+            index_second = i;
+        }
+    }
+    // randomly select one of those 2
+    if (now % 2) {
+        subvol = layout->list[index_first].xlator;
+    } else {
+        subvol = layout->list[index_second].xlator;
+    } 
+    gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
+            "returning subvol:%d", i, NULL);
+#else //MIN
+    uint64_t min_fop = 0xFFFFFFFFFFFFFFFF;
 
     for (i = 0; i < layout->cnt; i++) {
         fop = GF_ATOMIC_GET(layout->list[i].xlator->stats[GF_FOP_WRITE].last_interval_fop);
         gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
-                "subvol:%d fops:%lu", i, fop, NULL);
+                "subvol:%d %s fops:%lu", i, layout->list[i].xlator->name, fop, NULL);
         if (fop < min_fop){
             min_fop = fop;
             subvol = layout->list[i].xlator;
         }
     }
+#endif
     gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
             "returning subvol:%d", i, NULL);
 
