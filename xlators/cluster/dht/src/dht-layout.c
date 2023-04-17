@@ -15,6 +15,9 @@
 // davy's
 #include "glusterfs/glusterfs-fops.h"
 #include <stdlib.h>
+#define RAND_OF_2MIN
+//#define MIN_OF_2RAND
+//#define MIN
 
 #define layout_base_size (sizeof(dht_layout_t))
 
@@ -116,9 +119,6 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
     gettimeofday(&tp, NULL);
     uint64_t now = (1000000 * tp.tv_sec) + tp.tv_usec;
 
-    gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
-            "now:%lu last:%lu", now, last, NULL);
-
     if ((now - last) >= 500000) { // in microseconds
         for (int i = 0; i < layout->cnt; i++) {
             uint64_t interval_fop = GF_ATOMIC_GET(
@@ -140,8 +140,7 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
     int i = 0;
     uint64_t fop;
     xlator_t *subvol = NULL;
-#define RANDMIN2
-#ifdef MINRAND2
+#ifdef MIN_OF_2RAND
     uint64_t fop_first, fop_second;
     int index_first, index_second;
 
@@ -161,7 +160,7 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
         subvol = layout->list[index_second].xlator;
     }
 
-#elif defined(RANDMIN2)
+#elif defined(RAND_OF_2MIN)
     uint64_t fop_first, fop_second = 0xFFFFFFFFFFFFFFFF;
     int index_first, index_second = 0;
     
@@ -191,16 +190,12 @@ dht_layout_search(xlator_t *this, dht_layout_t *layout, const char *name)
 
     for (i = 0; i < layout->cnt; i++) {
         fop = GF_ATOMIC_GET(layout->list[i].xlator->stats[GF_FOP_WRITE].last_interval_fop);
-        gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
-                "subvol:%d %s fops:%lu", i, layout->list[i].xlator->name, fop, NULL);
         if (fop < min_fop){
             min_fop = fop;
             subvol = layout->list[i].xlator;
         }
     }
 #endif
-    gf_smsg(this->name, GF_LOG_WARNING, 0, DHT_MSG_COMPUTE_HASH_FAILED,
-            "returning subvol:%d", i, NULL);
 
 out:
     return subvol;
